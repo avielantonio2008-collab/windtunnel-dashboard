@@ -12,16 +12,15 @@ const firebaseConfig = {
   authDomain: "aeropulse-8ffb6.firebaseapp.com",
   databaseURL: "https://aeropulse-8ffb6-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "aeropulse-8ffb6",
-  storageBucket: "aeropulse-8ffb6.firebasestorage.app",
+  storageBucket: "aeropulse-8ffb6.appspot.com",
   messagingSenderId: "597190603677",
   appId: "1:597190603677:web:d95333ec65edf9877df574",
   measurementId: "G-Q1VKYQMJBD"
 };
 
-
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+// Initialize Firebase (MODULAR)
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
 // ---------- DOM Elements ----------
 const el = {
@@ -45,18 +44,18 @@ const ctx = canvas.getContext('2d');
 let w, h, angleOfAttack = 0;
 
 function resize() {
-  w = canvas.clientWidth; 
+  w = canvas.clientWidth;
   h = canvas.clientHeight;
-  canvas.width = w; 
+  canvas.width = w;
   canvas.height = h;
 }
 resize();
 window.addEventListener('resize', resize);
 
-// ---------- NACA 0012 ----------
+// ---------- NACA 0012 Drawing ----------
 function drawNACA0012() {
   ctx.save();
-  ctx.translate(w/2, h/2);
+  ctx.translate(w / 2, h / 2);
   ctx.rotate(angleOfAttack * Math.PI / 180);
 
   const chord = 220;
@@ -71,15 +70,19 @@ function drawNACA0012() {
 
   for (let i = 0; i <= points; i++) {
     const t = i / points;
-    const x = chord * t - chord/2;
-    const yt = 5 * 0.12 * chord * (a[0]*Math.sqrt(t) + a[1]*t + a[2]*t*t + a[3]*t*t*t + a[4]*t*t*t*t);
-    i===0 ? ctx.moveTo(x, yt) : ctx.lineTo(x, yt);
+    const x = chord * t - chord / 2;
+    const yt = 5 * 0.12 * chord *
+      (a[0] * Math.sqrt(t) + a[1] * t + a[2] * t * t +
+       a[3] * t * t * t + a[4] * t * t * t * t);
+    i === 0 ? ctx.moveTo(x, yt) : ctx.lineTo(x, yt);
   }
 
   for (let i = points; i >= 0; i--) {
     const t = i / points;
-    const x = chord * t - chord/2;
-    const yt = 5 * 0.12 * chord * (a[0]*Math.sqrt(t) + a[1]*t + a[2]*t*t + a[3]*t*t*t + a[4]*t*t*t*t);
+    const x = chord * t - chord / 2;
+    const yt = 5 * 0.12 * chord *
+      (a[0] * Math.sqrt(t) + a[1] * t + a[2] * t * t +
+       a[3] * t * t * t + a[4] * t * t * t * t);
     ctx.lineTo(x, -yt);
   }
 
@@ -103,20 +106,20 @@ class Particle {
     this.maxTrail = 15;
   }
   update() {
-    this.trail.push({x:this.x, y:this.y});
+    this.trail.push({ x: this.x, y: this.y });
     if (this.trail.length > this.maxTrail) this.trail.shift();
     this.x += this.speed;
 
-    const dx = this.x - w/2, dy = this.y - h/2;
+    const dx = this.x - w / 2, dy = this.y - h / 2;
     const dist = Math.hypot(dx, dy);
     if (dist < 260) {
       const flow = Math.atan2(dy, dx);
-      const def = (angleOfAttack * Math.PI/180) * (1 - dist/260);
+      const def = (angleOfAttack * Math.PI / 180) * (1 - dist / 260);
       this.y += Math.sin(flow + def) * 2;
 
       if (Math.abs(angleOfAttack) > 15 && Math.random() < .3) {
-        this.y += (Math.random()-.5)*6;
-        this.x += (Math.random()-.5)*2;
+        this.y += (Math.random() - .5) * 6;
+        this.x += (Math.random() - .5) * 2;
       }
     }
     if (this.x > w + 50) this.reset();
@@ -125,24 +128,24 @@ class Particle {
     ctx.strokeStyle = 'rgba(0,255,255,.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    this.trail.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    this.trail.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
     ctx.stroke();
 
-    const g = ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.size*3);
-    g.addColorStop(0,'rgba(0,255,255,1)');
-    g.addColorStop(1,'rgba(0,255,255,0)');
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 3);
+    g.addColorStop(0, 'rgba(0,255,255,1)');
+    g.addColorStop(1, 'rgba(0,255,255,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(this.x,this.y,this.size*3,0,Math.PI*2);
+    ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
     ctx.fill();
   }
 }
-const particles = Array.from({length:100},()=>new Particle());
+const particles = Array.from({ length: 100 }, () => new Particle());
 
 function animate() {
   ctx.fillStyle = 'rgba(10,10,26,.1)';
-  ctx.fillRect(0,0,w,h);
-  particles.forEach(p=>{p.update(); p.draw();});
+  ctx.fillRect(0, 0, w, h);
+  particles.forEach(p => { p.update(); p.draw(); });
   drawNACA0012();
   requestAnimationFrame(animate);
 }
@@ -178,15 +181,13 @@ onValue(sensorRef, (snapshot) => {
   }
 });
 
-// ---------- Optional mouse control ----------
-canvas.addEventListener('mousemove', e=>{
+// ---------- Mouse Control ----------
+canvas.addEventListener('mousemove', e => {
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
-  const dist = mx - w/2;
-  angleOfAttack = (dist/(w/3))*18;
+  const dist = mx - w / 2;
+  angleOfAttack = (dist / (w / 3)) * 18;
   angleOfAttack = Math.max(-18, Math.min(18, angleOfAttack));
   el.aoa.innerHTML = `${angleOfAttack.toFixed(1)}<span class="unit">°</span>`;
   el.angleControl.textContent = `${angleOfAttack.toFixed(1)}°`;
 });
-
-
