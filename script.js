@@ -35,7 +35,7 @@ const elements = {
 };
 
 // Firebase Realtime Database listener
-onValue(ref(db, "/"), (snapshot) => {
+onValue(ref(db, "windtunnel"), (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
 
@@ -134,3 +134,4 @@ function animate() {
 
 createParticles();
 animate();
+
