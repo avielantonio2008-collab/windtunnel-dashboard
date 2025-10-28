@@ -1,30 +1,35 @@
-// Import the Firebase modules
+// Import Firebase SDKs from the CDN (works for GitHub Pages)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 // Your Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAGZcG4TJNXMPrN8Gj5MYV3wd4GTHk0r8I",
+  authDomain: "aeropulse-8ffb6.firebaseapp.com",
+  databaseURL: "https://aeropulse-8ffb6-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "aeropulse-8ffb6",
+  storageBucket: "aeropulse-8ffb6.firebasestorage.app",
+  messagingSenderId: "597190603677",
+  appId: "1:597190603677:web:d95333ec65edf9877df574",
+  measurementId: "G-Q1VKYQMJBD"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Reference your data node
+// Reference the "windtunnel" node
 const dataRef = ref(db, "windtunnel");
 
 // Listen for real-time updates
 onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
-  if (!data) return;
+  if (!data) {
+    console.log("No data available");
+    return;
+  }
 
+  // Update all your dashboard fields
   document.getElementById("viscosity").textContent = data.viscosity ?? "--";
   document.getElementById("density").textContent = data.density ?? "--";
   document.getElementById("pressure").textContent = data.pressure ?? "--";
