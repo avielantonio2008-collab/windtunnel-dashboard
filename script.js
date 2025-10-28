@@ -1,68 +1,40 @@
-/* ==============================================================
-   AeroPulse – Wind-Tunnel Dashboard (Firebase Edition)
-   ============================================================== */
+// Import the Firebase modules
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// ---------- Firebase Config ----------
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
-
+// Your Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAGZcG4TJNXMPrN8Gj5MYV3wd4GTHk0r8I",
-  authDomain: "aeropulse-8ffb6.firebaseapp.com",
-  databaseURL: "https://aeropulse-8ffb6-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "aeropulse-8ffb6",
-  storageBucket: "aeropulse-8ffb6.firebasestorage.app",
-  messagingSenderId: "597190603677",
-  appId: "1:597190603677:web:d95333ec65edf9877df574",
-  measurementId: "G-Q1VKYQMJBD"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
-// Initialize Firebase (new modular syntax)
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ---------- DOM Elements ----------
-const el = {
-  viscosity: document.getElementById('viscosity'),
-  density: document.getElementById('density'),
-  pressure: document.getElementById('pressure'),
-  temperature: document.getElementById('temperature'),
-  humidity: document.getElementById('humidity'),
-  pressureDiff: document.getElementById('pressureDiff'),
-  lift: document.getElementById('lift'),
-  reynolds: document.getElementById('reynolds'),
-  airspeed: document.getElementById('airspeed'),
-  aoa: document.getElementById('aoa'),
-  angleControl: document.getElementById('angleControl'),
-  flowType: document.getElementById('flowType')
-};
+// Reference your data node
+const dataRef = ref(db, "windtunnel");
 
-// ---------- Firebase Live Data ----------
-const sensorRef = ref(db, "sensors");
-onValue(sensorRef, (snapshot) => {
+// Listen for real-time updates
+onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
 
-  el.viscosity.innerHTML   = `${data.viscosity.toFixed(3)}<span class="unit">×10⁻⁵ Pa·s</span>`;
-  el.density.innerHTML     = `${data.density.toFixed(3)}<span class="unit">kg/m³</span>`;
-  el.pressure.innerHTML    = `${data.pressure.toFixed(1)}<span class="unit">kPa</span>`;
-  el.temperature.innerHTML = `${data.temperature.toFixed(1)}<span class="unit">°C</span>`;
-  el.humidity.innerHTML    = `${Math.round(data.humidity)}<span class="unit">%</span>`;
-  el.pressureDiff.innerHTML= `${data.pressureDiff.toFixed(2)}<span class="unit">kPa</span>`;
-  el.lift.innerHTML        = `${Math.round(data.lift)}<span class="unit">N</span>`;
-  el.reynolds.innerHTML    = `${data.reynolds.toFixed(1)}<span class="unit">×10⁶</span>`;
-  el.airspeed.innerHTML    = `${data.airspeed.toFixed(1)}<span class="unit">m/s</span>`;
-
-  const angleOfAttack = data.aoa;
-  el.aoa.innerHTML = `${angleOfAttack.toFixed(1)}<span class="unit">°</span>`;
-  el.angleControl.textContent = `${angleOfAttack.toFixed(1)}°`;
-
-  const re = data.reynolds * 1e6;
-  if (re > 3e6) {
-    el.flowType.textContent = 'TURBULENT';
-    el.flowType.className = 'flow-status turbulent';
-  } else {
-    el.flowType.textContent = 'LAMINAR';
-    el.flowType.className = 'flow-status laminar';
-  }
+  document.getElementById("viscosity").textContent = data.viscosity ?? "--";
+  document.getElementById("density").textContent = data.density ?? "--";
+  document.getElementById("pressure").textContent = data.pressure ?? "--";
+  document.getElementById("temperature").textContent = data.temperature ?? "--";
+  document.getElementById("humidity").textContent = data.humidity ?? "--";
+  document.getElementById("pressureDiff").textContent = data.pressureDiff ?? "--";
+  document.getElementById("lift").textContent = data.lift ?? "--";
+  document.getElementById("reynolds").textContent = data.reynolds ?? "--";
+  document.getElementById("airspeed").textContent = data.airspeed ?? "--";
+  document.getElementById("aoa").textContent = data.aoa ?? "--";
+  document.getElementById("flowType").textContent = data.flowType ?? "---";
+  document.getElementById("angleControl").textContent = (data.aoa ?? "--") + "°";
 });
