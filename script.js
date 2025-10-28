@@ -8,14 +8,16 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/fireba
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
+  apiKey: "AIzaSyAGZcG4TJNXMPrN8Gj5MYV3wd4GTHk0r8I",
+  authDomain: "aeropulse-8ffb6.firebaseapp.com",
+  databaseURL: "https://aeropulse-8ffb6-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "aeropulse-8ffb6",
+  storageBucket: "aeropulse-8ffb6.firebasestorage.app",
+  messagingSenderId: "597190603677",
+  appId: "1:597190603677:web:d95333ec65edf9877df574",
+  measurementId: "G-Q1VKYQMJBD"
 };
+
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -186,3 +188,4 @@ canvas.addEventListener('mousemove', e=>{
   el.aoa.innerHTML = `${angleOfAttack.toFixed(1)}<span class="unit">°</span>`;
   el.angleControl.textContent = `${angleOfAttack.toFixed(1)}°`;
 });
+
