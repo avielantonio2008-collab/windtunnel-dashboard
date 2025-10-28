@@ -20,8 +20,8 @@ const firebaseConfig = {
 
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
 // ---------- DOM Elements ----------
 const el = {
@@ -188,4 +188,5 @@ canvas.addEventListener('mousemove', e=>{
   el.aoa.innerHTML = `${angleOfAttack.toFixed(1)}<span class="unit">°</span>`;
   el.angleControl.textContent = `${angleOfAttack.toFixed(1)}°`;
 });
+
 
