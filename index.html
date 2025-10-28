@@ -1,71 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AeroPulse – Wind-Tunnel Dashboard</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroPulse – Wind-Tunnel Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <div class="grid-bg"></div>
+  <!-- Background Grid -->
+  <div class="grid-bg"></div>
 
-    <div class="container">
-        <header>
-            <h1>AeroPulse</h1>
-        </header>
+  <div class="container">
+    <header>
+      <h1>AeroPulse</h1>
+    </header>
 
-        <div class="dashboard">
-            <!-- Fluid Properties -->
-            <section class="data-panel">
-                <h2 class="panel-title">FLUID PROPERTIES</h2>
-                <div class="data-grid">
-                    <div class="data-item"><span class="label">Viscosity</span><span class="value" id="viscosity">--</span></div>
-                    <div class="data-item"><span class="label">Density</span><span class="value" id="density">--</span></div>
-                    <div class="data-item"><span class="label">Pressure</span><span class="value" id="pressure">--</span></div>
-                    <div class="data-item"><span class="label">Temperature</span><span class="value" id="temperature">--</span></div>
-                </div>
-            </section>
-
-            <!-- Environmental Conditions -->
-            <section class="data-panel">
-                <h2 class="panel-title">ENVIRONMENTAL CONDITIONS</h2>
-                <div class="data-grid">
-                    <div class="data-item"><span class="label">Humidity</span><span class="value" id="humidity">--</span></div>
-                    <div class="data-item"><span class="label">Pressure Diff</span><span class="value" id="pressureDiff">--</span></div>
-                    <div class="data-item"><span class="label">Lift Force</span><span class="value" id="lift">--</span></div>
-                    <div class="data-item"><span class="label">Reynolds No.</span><span class="value" id="reynolds">--</span></div>
-                </div>
-            </section>
-
-            <!-- Flight Parameters -->
-            <section class="data-panel">
-                <h2 class="panel-title">FLIGHT PARAMETERS</h2>
-                <div class="data-grid">
-                    <div class="data-item"><span class="label">Airspeed</span><span class="value" id="airspeed">--</span></div>
-                    <div class="data-item"><span class="label">Angle of Attack</span><span class="value" id="aoa">--</span></div>
-                    <div class="data-item flow-item"><span class="label">Flow Regime</span><span class="flow-status" id="flowType">---</span></div>
-                </div>
-            </section>
-
-            <!-- Airfoil Visualization -->
-            <section class="visualization-panel">
-                <h2 class="panel-title">NACA 0012 AIRFOIL FLOW</h2>
-                <canvas id="airfoilCanvas"></canvas>
-                <div class="controls">
-                    <span class="control-label">Angle of Attack:</span>
-                    <span class="angle-display" id="angleControl">--°</span>
-                </div>
-            </section>
+    <div class="dashboard">
+      <!-- Fluid Properties -->
+      <section class="data-panel">
+        <h2 class="panel-title">FLUID PROPERTIES</h2>
+        <div class="data-grid">
+          <div class="data-item"><span class="label">Viscosity</span><span class="value" id="viscosity">--</span></div>
+          <div class="data-item"><span class="label">Density</span><span class="value" id="density">--</span></div>
+          <div class="data-item"><span class="label">Pressure</span><span class="value" id="pressure">--</span></div>
+          <div class="data-item"><span class="label">Temperature</span><span class="value" id="temperature">--</span></div>
         </div>
+      </section>
 
-        <footer>
-            <span class="status-indicator"></span>
-            <span>AeroPulse System Online • Real-time Wind-Tunnel Monitoring</span>
-        </footer>
+      <!-- Environmental Conditions -->
+      <section class="data-panel">
+        <h2 class="panel-title">ENVIRONMENTAL CONDITIONS</h2>
+        <div class="data-grid">
+          <div class="data-item"><span class="label">Humidity</span><span class="value" id="humidity">--</span></div>
+          <div class="data-item"><span class="label">Pressure Diff</span><span class="value" id="pressureDiff">--</span></div>
+          <div class="data-item"><span class="label">Lift Force</span><span class="value" id="lift">--</span></div>
+          <div class="data-item"><span class="label">Reynolds No.</span><span class="value" id="reynolds">--</span></div>
+        </div>
+      </section>
+
+      <!-- Flight Parameters -->
+      <section class="data-panel">
+        <h2 class="panel-title">FLIGHT PARAMETERS</h2>
+        <div class="data-grid">
+          <div class="data-item"><span class="label">Airspeed</span><span class="value" id="airspeed">--</span></div>
+          <div class="data-item"><span class="label">Angle of Attack</span><span class="value" id="aoa">--</span></div>
+          <div class="data-item flow-item"><span class="label">Flow Regime</span><span class="flow-status" id="flowType">---</span></div>
+        </div>
+      </section>
+
+      <!-- Airfoil Visualization -->
+      <section class="visualization-panel">
+        <h2 class="panel-title">NACA 0012 AIRFOIL FLOW</h2>
+        <canvas id="airfoilCanvas"></canvas>
+        <div class="controls">
+          <span class="control-label">Angle of Attack:</span>
+          <span class="angle-display" id="angleControl">--°</span>
+        </div>
+      </section>
     </div>
 
-    <!-- Firebase Script (modular) -->
-    <script type="module" src="script.js"></script>
+    <footer>
+      <span class="status-indicator"></span>
+      <span>AeroPulse System Online • Real-time Wind-Tunnel Monitoring</span>
+    </footer>
+  </div>
+
+  <!-- Firebase SDK and Dashboard Script -->
+  <script type="module" src="script.js"></script>
+
+  <!-- Optional: Fix for Canvas Resize -->
+  <script>
+    window.addEventListener('resize', () => {
+      const canvas = document.getElementById('airfoilCanvas');
+      if (canvas) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+      }
+    });
+  </script>
 </body>
 </html>
