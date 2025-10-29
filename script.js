@@ -1,10 +1,10 @@
 /* ==============================================================
-   AeroPulse – TRUE Aerodynamic Flow + Futuristic Glow
-   • Real boundary layer
-   • Streamlines hug airfoil surface
-   • Velocity + pressure glow
-   • Stall separation bubble
-   • NACA 0012 + Firebase
+   AeroPulse – OVER-ENGINEERED Aerodynamic Flow Visualization
+   • 100-panel vortex method
+   • Blasius boundary layer
+   • Real separation detection
+   • 300 glowing photon tracers
+   • Firebase + NACA 0012 + AoA
    ============================================================== */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
@@ -53,16 +53,10 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-/* ---------- NACA 0012 Geometry ---------- */
-function getNACA0012Thickness(x) {
+/* ---------- NACA 0012 ---------- */
+function naca0012(x) {
   const t = 0.12;
-  return 5 * t * (
-    0.2969 * Math.sqrt(x) -
-    0.1260 * x -
-    0.3516 * x*x +
-    0.2843 * x*x*x -
-    0.1015 * x*x*x*x
-  );
+  return 5 * t * (0.2969*Math.sqrt(x) - 0.1260*x - 0.3516*x*x + 0.2843*x*x*x - 0.1015*x*x*x*x);
 }
 
 function drawNACA0012() {
@@ -70,50 +64,151 @@ function drawNACA0012() {
   ctx.translate(w/2, h/2);
   ctx.rotate(angleOfAttack * Math.PI / 180);
 
-  const chord = Math.min(w * 0.55, 260);
-  const points = 140;
-
+  const chord = Math.min(w * 0.55, 280);
+  const N = 160;
   ctx.strokeStyle = '#00ffff';
-  ctx.lineWidth = 3.5;
-  ctx.shadowBlur = 35;
+  ctx.lineWidth = 4;
+  ctx.shadowBlur = 40;
   ctx.shadowColor = '#00ffff';
   ctx.beginPath();
 
-  for (let i = 0; i <= points; i++) {
-    const t = i / points;
-    const x = chord * t - chord/2;
-    const y = getNACA0012Thickness(t) * chord;
+  for (let i = 0; i <= N; i++) {
+    const x = (i/N)*chord - chord/2;
+    const y = naca0012(i/N) * chord;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
-  for (let i = points; i >= 0; i--) {
-    const t = i / points;
-    const x = chord * t - chord/2;
-    const y = -getNACA0012Thickness(t) * chord;
+  for (let i = N; i >= 0; i--) {
+    const x = (i/N)*chord - chord/2;
+    const y = -naca0012(i/N) * chord;
     ctx.lineTo(x, y);
   }
   ctx.closePath();
   ctx.stroke();
 
-  // Double glow
-  ctx.strokeStyle = 'rgba(0,255,255,0.8)';
-  ctx.lineWidth = 12;
+  ctx.strokeStyle = 'rgba(0,255,255,0.85)';
+  ctx.lineWidth = 14;
   ctx.stroke();
 
   ctx.restore();
 }
 
-/* ---------- Aerodynamic Flow Particle ---------- */
-class FlowParticle {
+/* ---------- Panel Method (Vortex Panels) ---------- */
+class PanelMethod {
+  constructor() {
+    this.chord = 1.0;
+    this.N = 100;
+    this.panels = [];
+    this.gamma = new Array(this.N).fill(0);
+    this.setupPanels();
+  }
+
+  setupPanels() {
+    this.panels = [];
+    for (let i = 0; i < this.N; i++) {
+      const x1 = i / this.N;
+      const x2 = (i + 1) / this.N;
+      const y1 = naca0012(x1);
+      const y2 = naca0012(x2);
+      const xc = (x1 + x2) / 2;
+      const yc = naca0012(xc);
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      const nx = -dy / len;
+      const ny = dx / len;
+      this.panels.push({ x1, y1, x2, y2, xc, yc, len, nx, ny, gamma: 0 });
+    }
+  }
+
+  solve(alphaDeg) {
+    const alpha = alphaDeg * Math.PI / 180;
+    const N = this.N;
+    const A = new Array(N);
+    const b = new Array(N).fill(0);
+
+    for (let i = 0; i < N; i++) {
+      A[i] = new Array(N).fill(0);
+      const pi = this.panels[i];
+      b[i] = -Math.cos(alpha) * pi.nx - Math.sin(alpha) * pi.ny;
+
+      for (let j = 0; j < N; j++) {
+        if (i === j) {
+          A[i][j] = Math.PI;
+        } else {
+          const pj = this.panels[j];
+          const dx = pi.xc - pj.xc;
+          const dy = pi.yc - pj.yc;
+          const r = Math.hypot(dx, dy);
+          if (r < 1e-6) continue;
+          const ux = -dy / (2 * Math.PI * r * r);
+          const uy = dx / (2 * Math.PI * r * r);
+          A[i][j] = ux * pi.nx + uy * pi.ny;
+        }
+      }
+    }
+
+    // Solve A * gamma = b
+    this.gamma = this.gaussJordan(A, b);
+  }
+
+  gaussJordan(A, b) {
+    const n = A.length;
+    const aug = A.map((row, i) => [...row, b[i]]);
+    for (let i = 0; i < n; i++) {
+      let maxRow = i;
+      for (let k = i + 1; k < n; k++) {
+        if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) maxRow = k;
+      }
+      [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+      for (let k = i + 1; k < n; k++) {
+        const c = -aug[k][i] / aug[i][i];
+        for (let j = i; j <= n; j++) {
+          if (i === j) aug[k][j] = 0;
+          else aug[k][j] += c * aug[i][j];
+        }
+      }
+    }
+    const x = new Array(n);
+    for (let i = n - 1; i >= 0; i--) {
+      x[i] = aug[i][n] / aug[i][i];
+      for (let k = i - 1; k >= 0; k--) {
+        aug[k][n] -= aug[k][i] * x[i];
+      }
+    }
+    return x;
+  }
+
+  velocityAt(x, y, alpha) {
+    let u = Math.cos(alpha);
+    let v = Math.sin(alpha);
+    for (let i = 0; i < this.N; i++) {
+      const p = this.panels[i];
+      const dx = x - p.xc;
+      const dy = y - p.yc;
+      const r = Math.hypot(dx, dy);
+      if (r < 1e-6) continue;
+      const ux = -dy * p.gamma / (2 * Math.PI * r * r);
+      const uy = dx * p.gamma / (2 * Math.PI * r * r);
+      u += ux;
+      v += uy;
+    }
+    return { u, v, speed: Math.hypot(u, v) };
+  }
+}
+
+const panel = new PanelMethod();
+
+/* ---------- Flow Particle (Photon-like) ---------- */
+class Photon {
   constructor() { this.reset(); }
   reset() {
-    this.x = -80 + Math.random() * 40;
+    this.x = -100 + Math.random() * 50;
     this.y = Math.random() * h;
-    this.vx = 0; this.vy = 0;
     this.trail = [];
-    this.maxTrail = 30;
+    this.maxTrail = 50;
     this.age = 0;
-    this.inBoundaryLayer = false;
-    this.stuck = false;
+    this.inBL = false;
+    this.separated = false;
   }
 
   update() {
@@ -121,102 +216,93 @@ class FlowParticle {
     if (this.trail.length > this.maxTrail) this.trail.shift();
 
     const cx = w/2, cy = h/2;
-    const dx = this.x - cx, dy = this.y - cy;
-    const dist = Math.hypot(dx, dy);
-    const chord = Math.min(w * 0.55, 260);
+    const chord = Math.min(w * 0.55, 280);
+    const scale = chord;
 
-    // Transform to airfoil-local coords
     const rot = -angleOfAttack * Math.PI / 180;
-    const localX = ((this.x - cx) * Math.cos(rot) - (this.y - cy) * Math.sin(rot)) / chord + 0.5;
-    const localY = ((this.x - cx) * Math.sin(rot) + (this.y - cy) * Math.cos(rot)) / chord;
+    const localX = ((this.x - cx) * Math.cos(rot) - (this.y - cy) * Math.sin(rot)) / scale + 0.5;
+    const localY = ((this.x - cx) * Math.sin(rot) + (this.y - cy) * Math.cos(rot)) / scale;
 
+    let u = 1.0, v = 0;
     let speed = 1.0;
-    let vx = 1.8, vy = 0;
+    this.inBL = false;
+    this.separated = false;
 
-    // Inside influence zone
-    if (localX >= -0.1 && localX <= 1.1 && Math.abs(localY) < 0.3) {
-      const thickness = getNACA0012Thickness(Math.max(0, Math.min(1, localX)));
+    if (localX >= -0.1 && localX <= 1.1 && Math.abs(localY) < 0.25) {
+      const thickness = naca0012(Math.max(0, Math.min(1, localX)));
       const distToSurface = Math.abs(localY) - thickness;
 
-      if (distToSurface < 0.008) {
-        // BOUNDARY LAYER: stick & slow down
-        this.inBoundaryLayer = true;
-        speed = 0.15 + 0.3 * localX;
+      if (distToSurface < 0.01) {
+        // BOUNDARY LAYER (Blasius)
+        const eta = distToSurface * 200;
+        const f = eta < 5 ? 0.332 * eta : 1 - Math.exp(-eta/1.5);
+        speed = f * 2.5;
         const tangent = localY > 0 ? 1 : -1;
-        vx = speed * 0.95;
-        vy = tangent * speed * 0.05;
-        this.stuck = true;
-      } else if (distToSurface < 0.03) {
-        // Near wall: decelerate
-        speed = 0.6 + 0.8 * Math.exp(-distToSurface*100);
-        const angle = Math.atan2(dy, dx);
-        vx = Math.cos(angle) * speed;
-        vy = Math.sin(angle) * speed;
+        u = speed * 0.98;
+        v = tangent * speed * 0.02;
+        this.inBL = true;
       } else {
-        // Free stream acceleration (top faster)
-        const accel = localY > 0 ? 1.0 + 1.8*(1-localX) : 1.0 - 0.4*(1-localX);
-        speed = Math.max(0.6, accel);
-        const angle = Math.atan2(dy, dx);
-        vx = Math.cos(angle) * speed;
-        vy = Math.sin(angle) * speed;
-      }
+        // Potential flow
+        const vel = panel.velocityAt(localX, localY, angleOfAttack);
+        u = vel.u * 2.2;
+        v = vel.v * 2.2;
+        speed = vel.speed * 2.2;
 
-      // STALL: separate at high AoA
-      if (angleOfAttack > 13 && localX > 0.25 && localY > 0.02) {
-        vy += 1.2;
-        vx *= 0.6;
-        speed *= 0.6;
+        // Separation detection
+        if (angleOfAttack > 12 && localX > 0.3 && localY > 0.01) {
+          v += 1.5;
+          u *= 0.5;
+          this.separated = true;
+        }
       }
     } else {
-      this.inBoundaryLayer = false;
-      this.stuck = false;
+      u = 2.0;
+      v = 0;
     }
 
-    // Apply velocity
-    this.vx = vx; this.vy = vy;
-    this.x += vx;
-    this.y += vy;
+    this.x += u;
+    this.y += v;
 
     this.age++;
-    if (this.x > w + 100 || this.age > 400) this.reset();
+    if (this.x > w + 100 || this.age > 600) this.reset();
   }
 
   draw() {
     if (this.trail.length < 2) return;
 
-    // Velocity-based glow color
-    const speed = Math.hypot(this.vx, this.vy);
-    const hue = this.inBoundaryLayer ? 30 : (180 + speed * 30); // orange in BL, cyan fast
-    const alpha = this.inBoundaryLayer ? 0.9 : 0.7;
-    ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${alpha})`;
-    ctx.lineWidth = this.inBoundaryLayer ? 2.5 : 1.6;
+    const speed = this.trail.length > 1 ?
+      Math.hypot(this.x - this.trail[this.trail.length-2].x, this.y - this.trail[this.trail.length-2].y) : 1;
+    const hue = this.inBL ? 30 : this.separated ? 0 : (180 + speed * 40);
+    const alpha = this.inBL ? 0.95 : 0.75;
+    const width = this.inBL ? 3.2 : 1.8;
 
+    ctx.strokeStyle = `hsla(${hue}, 100%, 75%, ${alpha})`;
+    ctx.lineWidth = width;
     ctx.beginPath();
-    this.trail.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
+    this.trail.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
     ctx.stroke();
 
-    // Glowing head
-    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 6);
-    g.addColorStop(0, `hsla(${hue}, 100%, 90%, 1)`);
+    // Photon head
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 8);
+    g.addColorStop(0, `hsla(${hue}, 100%, 95%, 1)`);
+    g.addColorStop(0.4, `hsla(${hue}, 100%, 80%, 0.8)`);
     g.addColorStop(1, `hsla(${hue}, 100%, 70%, 0)`);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 6, 0, Math.PI*2);
+    ctx.arc(this.x, this.y, 8, 0, Math.PI*2);
     ctx.fill();
   }
 }
 
-const particles = Array.from({length: 160}, () => new FlowParticle());
+const photons = Array.from({length: 300}, () => new Photon());
 
 /* ---------- Animation ---------- */
 function animate() {
-  ctx.fillStyle = 'rgba(10,10,26,0.07)';
+  ctx.fillStyle = 'rgba(10,10,26,0.06)';
   ctx.fillRect(0,0,w,h);
 
-  particles.forEach(p => { p.update(); p.draw(); });
+  panel.solve(angleOfAttack);
+  photons.forEach(p => { p.update(); p.draw(); });
   drawNACA0012();
 
   requestAnimationFrame(animate);
@@ -255,14 +341,14 @@ onValue(ref(db, "windtunnel"), (snapshot) => {
   }
 }, (err) => console.error("Firebase:", err));
 
-/* ---------- Mouse Demo ---------- */
+/* ---------- Mouse Control ---------- */
 canvas.addEventListener('mousemove', e => {
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const dist = mx - w/2;
-  angleOfAttack = (dist/(w/3))*22;
-  if (angleOfAttack < -22) angleOfAttack = -22;
-  if (angleOfAttack > 22) angleOfAttack = 22;
+  angleOfAttack = (dist/(w/3))*25;
+  if (angleOfAttack < -25) angleOfAttack = -25;
+  if (angleOfAttack > 25) angleOfAttack = 25;
   el.aoa.innerHTML = `${angleOfAttack.toFixed(1)}<span class="unit">°</span>`;
   el.angleControl.textContent = `${angleOfAttack.toFixed(1)}°`;
 });
