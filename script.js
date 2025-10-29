@@ -1,5 +1,9 @@
 /* ==============================================================
-   AeroPulse – Wind-Tunnel Dashboard (Firebase + Fixed Airfoil/Particles)
+   AeroPulse – Realistic Airflow + NACA 0012 + Firebase
+   • Streamline-based flow field
+   • Velocity coloring (blue = slow, cyan = fast)
+   • Stall separation at high AoA
+   • Glow airfoil + live data
    ============================================================== */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
@@ -42,32 +46,28 @@ const ctx = canvas.getContext('2d');
 let w, h, angleOfAttack = 0;
 
 function resize() {
-  w = canvas.clientWidth;
-  h = canvas.clientHeight;
-  canvas.width = w;
-  canvas.height = h;
+  w = canvas.clientWidth; h = canvas.clientHeight;
+  canvas.width = w; canvas.height = h;
 }
 resize();
 window.addEventListener('resize', resize);
 
-/* ---------- NACA 0012 (exact equation) ---------- */
+/* ---------- NACA 0012 ---------- */
 function drawNACA0012() {
   ctx.save();
   ctx.translate(w/2, h/2);
   ctx.rotate(angleOfAttack * Math.PI / 180);
 
-  const chord = Math.min(w * 0.55, 260);               // responsive chord
+  const chord = Math.min(w * 0.55, 260);
   const a = [0.2969, -0.1260, -0.3516, 0.2843, -0.1015];
   const points = 120;
 
-  // ---- bright cyan line ----
   ctx.strokeStyle = '#00ffff';
   ctx.lineWidth = 3;
-  ctx.shadowBlur = 25;
+  ctx.shadowBlur = 30;
   ctx.shadowColor = '#00ffff';
   ctx.beginPath();
 
-  // upper surface
   for (let i = 0; i <= points; i++) {
     const t = i / points;
     const x = chord * t - chord/2;
@@ -75,7 +75,6 @@ function drawNACA0012() {
       (a[0]*Math.sqrt(t) + a[1]*t + a[2]*t*t + a[3]*t*t*t + a[4]*t*t*t*t);
     i === 0 ? ctx.moveTo(x, yt) : ctx.lineTo(x, yt);
   }
-  // lower surface
   for (let i = points; i >= 0; i--) {
     const t = i / points;
     const x = chord * t - chord/2;
@@ -86,83 +85,111 @@ function drawNACA0012() {
   ctx.closePath();
   ctx.stroke();
 
-  // ---- extra glow layer ----
-  ctx.strokeStyle = 'rgba(0,255,255,0.6)';
-  ctx.lineWidth = 9;
+  ctx.strokeStyle = 'rgba(0,255,255,0.7)';
+  ctx.lineWidth = 10;
   ctx.stroke();
 
   ctx.restore();
 }
 
-/* ---------- Particle System (flows around airfoil) ---------- */
-class Particle {
-  constructor() { this.reset(); }
+/* ---------- Realistic Flow Field ---------- */
+class Streamline {
+  constructor() {
+    this.reset();
+  }
   reset() {
-    this.x = -60;
+    this.x = -50;
     this.y = Math.random() * h;
-    this.speed = 2.2 + Math.random() * 2.5;
-    this.size = 2 + Math.random() * 1.5;
+    this.age = 0;
+    this.maxAge = 300;
     this.trail = [];
-    this.maxTrail = 18;
+    this.maxTrail = 40;
   }
   update() {
-    // trail
     this.trail.push({x: this.x, y: this.y});
     if (this.trail.length > this.maxTrail) this.trail.shift();
 
-    // base movement
-    this.x += this.speed;
-
-    // ---------- flow deflection ----------
-    const cx = w/2, cy = h/2;                     // airfoil centre (after rotation)
+    const cx = w/2, cy = h/2;
     const dx = this.x - cx, dy = this.y - cy;
     const dist = Math.hypot(dx, dy);
+    const chord = Math.min(w * 0.55, 260);
 
-    if (dist < 300) {                            // influence radius
-      const flowAngle = Math.atan2(dy, dx);
-      const deflection = (angleOfAttack * Math.PI/180) * (1 - dist/300);
-      this.y += Math.sin(flowAngle + deflection) * 2.2;
+    let vx = 1.0, vy = 0;
+    let speed = 1.0;
 
-      // high-AoA turbulence
-      if (Math.abs(angleOfAttack) > 15 && Math.random() < 0.35) {
-        this.y += (Math.random() - 0.5) * 7;
-        this.x += (Math.random() - 0.5) * 2;
+    if (dist < chord * 1.2) {
+      // Inside influence zone
+      const localX = ((this.x - cx) * Math.cos(-angleOfAttack * Math.PI/180) - (this.y - cy) * Math.sin(-angleOfAttack * Math.PI/180)) / chord + 0.5;
+      const localY = ((this.x - cx) * Math.sin(-angleOfAttack * Math.PI/180) + (this.y - cy) * Math.cos(-angleOfAttack * Math.PI/180)) / chord;
+
+      if (localX >= 0 && localX <= 1) {
+        const thickness = 0.12 * (
+          0.2969*Math.sqrt(localX) - 0.1260*localX - 0.3516*localX**2 + 0.2843*localX**3 - 0.1015*localX**4
+        );
+        const distToSurface = Math.abs(localY) - thickness;
+
+        if (distToSurface < 0.05) {
+          // Very close → follow surface
+          const tangentX = 1;
+          const tangentY = (localY > 0 ? 1 : -1) * 0.3;
+          const len = Math.hypot(tangentX, tangentY);
+          vx = tangentX / len * 1.3;
+          vy = tangentY / len * 1.3;
+          speed = 1.3;
+        } else {
+          // Potential flow acceleration
+          const accel = 1.0 + 2.0 * Math.exp(-distToSurface*distToSurface*200);
+          speed = Math.min(accel, 3.0);
+          const angle = Math.atan2(dy, dx);
+          vx = Math.cos(angle) * speed;
+          vy = Math.sin(angle) * speed;
+        }
+
+        // Stall: separate flow at high AoA
+        if (angleOfAttack > 14 && localX > 0.3 && localY > 0) {
+          vy += 0.8;
+          vx *= 0.7;
+          speed *= 0.7;
+        }
       }
     }
 
-    // reset when off-screen
-    if (this.x > w + 60) this.reset();
+    // Apply velocity
+    this.x += vx * 1.8;
+    this.y += vy * 1.8;
+
+    this.age++;
+    if (this.x > w + 50 || this.age > this.maxAge) this.reset();
   }
   draw() {
-    // trail
-    ctx.strokeStyle = 'rgba(0,255,255,0.35)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    this.trail.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
-    ctx.stroke();
+    if (this.trail.length < 2) return;
 
-    // particle glow
-    const g = ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.size*3.5);
-    g.addColorStop(0, 'rgba(0,255,255,1)');
-    g.addColorStop(1, 'rgba(0,255,255,0)');
-    ctx.fillStyle = g;
+    ctx.strokeStyle = this.getColor();
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size*3.5, 0, Math.PI*2);
-    ctx.fill();
+    this.trail.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+  }
+  getColor() {
+    const speed = this.trail.length > 1 ?
+      Math.hypot(this.x - this.trail[this.trail.length-2].x, this.y - this.trail[this.trail.length-2].y) : 1;
+    const normSpeed = Math.min(speed / 5, 1);
+    const hue = 180 + normSpeed * 60; // blue → cyan
+    return `hsl(${hue}, 100%, 65%)`;
   }
 }
-const particles = Array.from({length: 110}, () => new Particle());
+
+const streamlines = Array.from({length: 120}, () => new Streamline());
 
 /* ---------- Animation Loop ---------- */
 function animate() {
-  // gentle fade (keeps trails visible)
-  ctx.fillStyle = 'rgba(10,10,26,0.09)';
+  ctx.fillStyle = 'rgba(10,10,26,0.08)';
   ctx.fillRect(0,0,w,h);
 
-  // particles first (so airfoil draws on top)
-  particles.forEach(p => { p.update(); p.draw(); });
-
-  // airfoil on top
+  streamlines.forEach(s => { s.update(); s.draw(); });
   drawNACA0012();
 
   requestAnimationFrame(animate);
@@ -174,7 +201,6 @@ onValue(ref(db, "windtunnel"), (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
 
-  // ---- UI with units (exact original formatting) ----
   el.viscosity.innerHTML   = `${(data.viscosity??0).toFixed(3)}<span class="unit">×10⁻⁵ Pa·s</span>`;
   el.density.innerHTML     = `${(data.density??0).toFixed(3)}<span class="unit">kg/m³</span>`;
   el.pressure.innerHTML    = `${(data.pressure??0).toFixed(1)}<span class="unit">kPa</span>`;
@@ -185,12 +211,10 @@ onValue(ref(db, "windtunnel"), (snapshot) => {
   el.reynolds.innerHTML    = `${(data.reynolds??0).toFixed(1)}<span class="unit">×10⁶</span>`;
   el.airspeed.innerHTML    = `${(data.airspeed??0).toFixed(1)}<span class="unit">m/s</span>`;
 
-  // ---- angle of attack (drives airfoil) ----
   angleOfAttack = data.angleOfAttack ?? 0;
   el.aoa.innerHTML = `${angleOfAttack.toFixed(1)}<span class="unit">°</span>`;
   el.angleControl.textContent = `${angleOfAttack.toFixed(1)}°`;
 
-  // ---- flow regime ----
   const re = (data.reynolds ?? 0) * 1e6;
   if (re > 4e6) {
     el.flowType.textContent = 'TURBULENT';
@@ -204,14 +228,14 @@ onValue(ref(db, "windtunnel"), (snapshot) => {
   }
 }, (err) => console.error("Firebase:", err));
 
-/* ---------- Optional mouse demo control ---------- */
+/* ---------- Mouse control (demo) ---------- */
 canvas.addEventListener('mousemove', e => {
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const dist = mx - w/2;
-  angleOfAttack = (dist/(w/3))*18;
-  if (angleOfAttack < -18) angleOfAttack = -18;
-  if (angleOfAttack > 18) angleOfAttack = 18;
+  angleOfAttack = (dist/(w/3))*20;
+  if (angleOfAttack < -20) angleOfAttack = -20;
+  if (angleOfAttack > 20) angleOfAttack = 20;
   el.aoa.innerHTML = `${angleOfAttack.toFixed(1)}<span class="unit">°</span>`;
   el.angleControl.textContent = `${angleOfAttack.toFixed(1)}°`;
 });
